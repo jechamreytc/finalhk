@@ -10,56 +10,31 @@ class Transaction
         $json = json_decode($json, true);
 
         $sql = "
-        SELECT 
-            a.stud_id, 
-            a.stud_name AS StudentFullname, 
-            e.sub_code, 
-            e.sub_descriptive_title, 
-            e.sub_section, 
-            e.sub_time, 
-            e.sub_room, 
-            f.day_name AS F2F_Day, 
-            n.day_name AS RC_Day, 
-            m.day_name AS F2F_Day_Office,
-            g.supM_name AS AdvisorFullname, 
-            i.dutyH_name AS TotalDutyHours, 
-            dept_name, 
-            d.offT_time, 
-            j.build_name, 
-            h.learning_name, 
-            i.dutyH_name - (
-                SELECT SUM(TIMESTAMPDIFF(HOUR, k2.dtr_current_time_in, k2.dtr_current_time_out))
-                FROM tbl_dtr AS k2
-                WHERE k2.dtr_assign_id = b.assign_id
-                AND k2.dtr_current_time_in <= k.dtr_current_time_in
-            ) AS RemainingHours,
-            (
-                SELECT SUM(TIMESTAMPDIFF(HOUR, k2.dtr_current_time_in, k2.dtr_current_time_out))
-                FROM tbl_dtr AS k2
-                WHERE k2.dtr_assign_id = b.assign_id
-            ) AS TotalRenderedHours,
-            b.assign_render_status
-        FROM tbl_scholars AS a
-        LEFT JOIN tbl_assign_scholars AS b ON b.assign_stud_id = a.stud_id
-        LEFT JOIN tbl_office_master AS c ON c.off_id = b.assign_office_id
-        LEFT JOIN tbl_office_type AS d ON d.offT_id = c.off_type_id
-        LEFT JOIN tbl_subjects AS e ON e.sub_id = c.off_subject_id
-        LEFT JOIN tbl_day AS f ON f.day_id = e.sub_day_f2f_id 
-        LEFT JOIN tbl_supervisors_master AS g ON g.supM_id = e.sub_supM_id
-        LEFT JOIN tbl_learning_modalities AS h ON h.learning_id = e.sub_learning_modalities_id
-        LEFT JOIN tbl_duty_hours AS i ON i.dutyH_id = b.assign_duty_hours_id
-        LEFT JOIN tbl_building AS j ON j.build_id = d.off_build_id
-        LEFT JOIN tbl_dtr AS k ON k.dtr_assign_id = b.assign_id
-        LEFT JOIN tbl_day AS m ON m.day_id = d.offT_day_id
-        LEFT JOIN tbl_day AS n ON n.day_id = e.sub_day_rc_id 
-        LEFT JOIN tbl_department AS o ON o.dept_id = d.offT_dept_id
-        WHERE a.stud_id = :stud_id
-        ORDER BY k.dtr_current_time_in DESC 
-        LIMIT 1;
+        SELECT p.stud_active_id, a.stud_name AS StudentFullname, e.sub_code, e.sub_descriptive_title, e.sub_section, e.sub_time, e.sub_room, f.day_name AS F2F_Day, n.day_name AS RC_Day, m.day_name AS F2F_Day_Office, g.supM_name AS AdvisorFullname, i.dutyH_name AS TotalDutyHours, dept_name, d.offT_time, j.build_name, h.learning_name, i.dutyH_name - (SELECT SUM(TIMESTAMPDIFF(HOUR, k2.dtr_current_time_in, k2.dtr_current_time_out)) FROM tbl_dtr AS k2 WHERE k2.dtr_assign_id = b.assign_id AND k2.dtr_current_time_in <= k.dtr_current_time_in) AS RemainingHours,(SELECT SUM(TIMESTAMPDIFF(HOUR, k2.dtr_current_time_in, k2.dtr_current_time_out)) FROM tbl_dtr AS k2 WHERE k2.dtr_assign_id = b.assign_id) AS TotalRenderedHours, b.assign_render_status 
+FROM tbl_scholars AS a
+INNER JOIN tbl_activescholars AS p ON p.stud_active_id = a.stud_id
+LEFT JOIN tbl_assign_scholars AS b ON b.assign_stud_id = p.stud_active_id
+LEFT JOIN tbl_office_master AS c ON c.off_id = b.assign_office_id
+LEFT JOIN tbl_office_type AS d ON d.offT_id = c.off_type_id
+LEFT JOIN tbl_subjects AS e ON e.sub_id = c.off_subject_id
+LEFT JOIN tbl_day AS f ON f.day_id = e.sub_day_f2f_id 
+LEFT JOIN tbl_supervisors_master AS g ON g.supM_id = e.sub_supM_id
+LEFT JOIN tbl_learning_modalities AS h ON h.learning_id = e.sub_learning_modalities_id
+LEFT JOIN tbl_duty_hours AS i ON i.dutyH_id = b.assign_duty_hours_id
+LEFT JOIN tbl_department AS o ON o.dept_id = d.offT_dept_id
+LEFT JOIN tbl_building AS j ON j.build_id = o.dept_build_id
+LEFT JOIN tbl_dtr AS k ON k.dtr_assign_id = b.assign_id
+LEFT JOIN tbl_day AS m ON m.day_id = d.offT_day_id
+LEFT JOIN tbl_day AS n ON n.day_id = e.sub_day_rc_id 
+
+WHERE stud_active_id = :stud_active_id
+ORDER BY k.dtr_current_time_in DESC 
+LIMIT 1
+    
     ";
 
         $stmt = $conn->prepare($sql);
-        $stmt->bindParam(':stud_id', $json['stud_id']);
+        $stmt->bindParam(':stud_active_id', $json['stud_active_id']);
         $stmt->execute();
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -67,7 +42,7 @@ class Transaction
             $updateSql = "
             UPDATE tbl_assign_scholars
             SET assign_render_status = 1
-            WHERE assign_stud_id = :stud_id
+            WHERE assign_stud_id = :stud_active_id
         ";
 
             $updateStmt = $conn->prepare($updateSql);
@@ -85,28 +60,29 @@ class Transaction
         include "connection.php";
         $json = json_decode($json, true);
         $sql = "SELECT 
-                a.stud_id, 
-                a.stud_name AS StudentFullname, 
-                c.dtr_date, 
-                d.session_name, 
-                TIME(c.dtr_current_time_in) AS dtr_time_in, 
-                TIME(c.dtr_current_time_out) AS dtr_time_out,
-                TIMEDIFF(TIME(c.dtr_current_time_out), TIME(c.dtr_current_time_in)) AS TotalRendered
+                a.stud_active_id, 
+                b.stud_name AS StudentFullname, 
+                d.dtr_date, 
+                e.session_name, 
+                TIME(d.dtr_current_time_in) AS dtr_time_in, 
+                TIME(d.dtr_current_time_out) AS dtr_time_out,
+                TIMEDIFF(TIME(d.dtr_current_time_out), TIME(d.dtr_current_time_in)) AS TotalRendered
             FROM 
-                tbl_scholars AS a
+                tbl_activescholars AS a
+            INNER JOIN tbl_scholars AS b ON b.stud_id = a.stud_active_id
             LEFT JOIN 
-                tbl_assign_scholars AS b ON b.assign_stud_id = a.stud_id
+                tbl_assign_scholars AS c ON c.assign_stud_id = a.stud_active_id
             LEFT JOIN 
-                tbl_dtr AS c ON c.dtr_assign_id = b.assign_id
+                tbl_dtr AS d ON d.dtr_assign_id = c.assign_id
             LEFT JOIN 
-                tbl_academic_session AS d ON d.session_id = b.assign_session_id
+                tbl_academic_session AS e ON e.session_id = c.assign_session_id
             WHERE 
-                a.stud_id = :stud_id
+                a.stud_active_id = :stud_active_id
             ORDER BY 
-                c.dtr_date";
+                d.dtr_date";
 
         $stmt = $conn->prepare($sql);
-        $stmt->bindParam(':stud_id', $json['stud_id']);
+        $stmt->bindParam(':stud_active_id', $json['stud_active_id']);
         $stmt->execute();
         $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -139,16 +115,16 @@ class Transaction
         include "connection.php";
 
         $json = json_decode($json, true);
-        $scannedID = $json['stud_id'];
+        $scannedID = $json['stud_active_id'];
         $currentDate = date('Y-m-d'); // Today's date
 
         // Step 1: Fetch the latest DTR data for the scanned student
         $sql = "
-        SELECT a.stud_id, b.assign_id AS assign_id, c.dtr_id, c.dtr_date, c.dtr_current_time_in, c.dtr_current_time_out
-        FROM tbl_scholars AS a
-        INNER JOIN tbl_assign_scholars AS b ON b.assign_stud_id = a.stud_id
+        SELECT a.stud_active_id, b.assign_id AS assign_id, c.dtr_id, c.dtr_date, c.dtr_current_time_in, c.dtr_current_time_out
+        FROM tbl_activescholars AS a
+        INNER JOIN tbl_assign_scholars AS b ON b.assign_stud_id = a.stud_active_id
         LEFT JOIN tbl_dtr AS c ON c.dtr_assign_id = b.assign_id AND c.dtr_date = :currentDate
-        WHERE a.stud_id = :scannedID
+        WHERE a.stud_active_id = :scannedID
         ORDER BY c.dtr_date DESC LIMIT 1
     ";
         $stmt = $conn->prepare($sql);
@@ -197,16 +173,18 @@ class Transaction
         $filteredResult = [];
 
         // Query for sub_supM_id
-        $sqlSubSup = "SELECT a.stud_id, a.stud_name AS Fullname, a.stud_contactNumber, a.stud_email,
-                              sub_code, sub_descriptive_title, h.sub_section, sub_time, sub_room,
-                              g.dutyH_name
+        $sqlSubSup = "SELECT b.stud_active_id, a.stud_name AS Fullname, a.stud_contactNumber, a.stud_email,
+                              sub_code, sub_descriptive_title, g.sub_section, sub_time, sub_room,
+                              f.dutyH_name
                        FROM tbl_scholars AS a
-                       LEFT JOIN tbl_assign_scholars AS b ON b.assign_stud_id = a.stud_id
-                       LEFT JOIN tbl_office_master AS c ON c.off_id = b.assign_office_id
-                       LEFT JOIN tbl_office_type AS d ON d.offT_id = c.off_type_id
-                       LEFT JOIN tbl_duty_hours AS g ON g.dutyH_id = b.assign_duty_hours_id
-                       LEFT JOIN tbl_subjects AS h ON h.sub_id = c.off_subject_id
-                       WHERE h.sub_supM_id = :supM_id";
+                       INNER JOIN tbl_activescholars AS b ON b.stud_active_id = a.stud_id
+                       LEFT JOIN tbl_assign_scholars AS c ON c.assign_stud_id = b.stud_active_id
+                       LEFT JOIN tbl_office_master AS d ON d.off_id = c.assign_office_id
+                       LEFT JOIN tbl_office_type AS e ON e.offT_id = d.off_type_id
+                       LEFT JOIN tbl_duty_hours AS f ON f.dutyH_id = c.assign_duty_hours_id
+                       LEFT JOIN tbl_subjects AS g ON g.sub_id = d.off_subject_id
+                       LEFT JOIN tbl_supervisors_master AS h ON h.supM_id = g.sub_supM_id
+                       WHERE g.sub_supM_id = :supM_id";
 
         $stmtSubSup = $conn->prepare($sqlSubSup);
         $stmtSubSup->bindParam(":supM_id", $supM_id);
@@ -215,7 +193,7 @@ class Transaction
 
         foreach ($resultSubSup as $row) {
             $filteredResult[] = [
-                'stud_id' => $row['stud_id'],
+                'stud_active_id' => $row['stud_active_id'],
                 'Fullname' => $row['Fullname'],
                 'stud_contactNumber' => $row['stud_contactNumber'],
                 'stud_email' => $row['stud_email'],
@@ -229,18 +207,19 @@ class Transaction
         }
 
         // Query for offT_supM_id
-        $sqlOffTSup = "SELECT a.stud_id, a.stud_name AS Fullname, a.stud_contactNumber, a.stud_email,
-                              g.dutyH_name, e.build_name, f.day_name, b.assign_render_status,
+        $sqlOffTSup = "SELECT b.stud_active_id, a.stud_name AS Fullname, a.stud_contactNumber, a.stud_email,
+                              h.dutyH_name, f.build_name, g.day_name, c.assign_render_status,
                               dept_name
                        FROM tbl_scholars AS a
-                       LEFT JOIN tbl_assign_scholars AS b ON b.assign_stud_id = a.stud_id
-                       LEFT JOIN tbl_office_master AS c ON c.off_id = b.assign_office_id
-                       LEFT JOIN tbl_office_type AS d ON d.offT_id = c.off_type_id
-                       LEFT JOIN tbl_building AS e ON e.build_id = d.off_build_id
-                       LEFT JOIN tbl_day AS f ON f.day_id = d.offT_day_id
-                       LEFT JOIN tbl_duty_hours AS g ON g.dutyH_id = b.assign_duty_hours_id
-                       LEFT JOIN tbl_department AS h ON h.dept_id = d.offT_dept_id
-                       WHERE d.offT_supM_id = :supM_id";
+                       INNER JOIN tbl_activescholars AS b ON b.stud_active_id = a.stud_id
+                       LEFT JOIN tbl_assign_scholars AS c ON c.assign_stud_id = b.stud_active_id
+                       LEFT JOIN tbl_office_master AS d ON d.off_id = c.assign_office_id
+                       LEFT JOIN tbl_office_type AS e ON e.offT_id = d.off_type_id
+                       LEFT JOIN tbl_day AS g ON g.day_id = e.offT_day_id
+                       LEFT JOIN tbl_duty_hours AS h ON h.dutyH_id = c.assign_duty_hours_id
+                       LEFT JOIN tbl_department AS j ON j.dept_id = e.offT_dept_id
+                       LEFT JOIN tbl_building AS f ON f.build_id = j.dept_build_id
+                       WHERE e.offT_supM_id = :supM_id";
 
         $stmtOffTSup = $conn->prepare($sqlOffTSup);
         $stmtOffTSup->bindParam(":supM_id", $supM_id);
@@ -249,7 +228,7 @@ class Transaction
 
         foreach ($resultOffTSup as $row) {
             $filteredResult[] = [
-                'stud_id' => $row['stud_id'],
+                'stud_active_id' => $row['stud_active_id'],
                 'Fullname' => $row['Fullname'],
                 'stud_contactNumber' => $row['stud_contactNumber'],
                 'stud_email' => $row['stud_email'],
