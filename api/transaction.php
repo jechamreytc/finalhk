@@ -414,14 +414,41 @@ LIMIT 1
     {
         include "connection.php";
 
-        $sql = "SELECT c.assign_stud_id, a.stud_name, d.dutyH_name, f.sub_room, g.supM_name, c.assign_render_status, c.assign_evaluation_status
-                FROM tbl_scholars AS a
-                LEFT JOIN tbl_activescholars AS b ON b.stud_active_id = a.stud_id
-                INNER JOIN tbl_assign_scholars AS c ON c.assign_stud_id = b.stud_active_id
-                INNER JOIN tbl_duty_hours AS d ON d.dutyH_id = c.assign_duty_hours_id
-                INNER JOIN tbl_office_master AS e ON e.off_id = c.assign_office_id
-                INNER JOIN tbl_subjects AS f ON f.sub_id = e.off_subject_id
-                INNER JOIN tbl_supervisors_master AS g ON g.supM_id = f.sub_supM_id";
+        $sql = "SELECT 
+    c.assign_stud_id, 
+    a.stud_name, 
+    d.dutyH_name, 
+    f.sub_room, 
+    g.supM_name, 
+    c.assign_render_status, 
+    c.assign_evaluation_status, 
+    SUM(TIMESTAMPDIFF(HOUR, h.dtr_current_time_in, h.dtr_current_time_out)) AS total_rendered_hours,
+    (180 - SUM(TIMESTAMPDIFF(HOUR, h.dtr_current_time_in, h.dtr_current_time_out))) AS remaining_hours
+FROM 
+    tbl_scholars AS a
+INNER JOIN 
+    tbl_activescholars AS b ON b.stud_active_id = a.stud_id
+INNER JOIN 
+    tbl_assign_scholars AS c ON c.assign_stud_id = b.stud_active_id
+INNER JOIN 
+    tbl_duty_hours AS d ON d.dutyH_id = c.assign_duty_hours_id
+INNER JOIN 
+    tbl_office_master AS e ON e.off_id = c.assign_office_id
+INNER JOIN 
+    tbl_subjects AS f ON f.sub_id = e.off_subject_id
+INNER JOIN 
+    tbl_supervisors_master AS g ON g.supM_id = f.sub_supM_id
+LEFT JOIN 
+    tbl_dtr AS h ON h.dtr_assign_id = c.assign_id
+GROUP BY 
+    c.assign_stud_id, 
+    a.stud_name, 
+    d.dutyH_name, 
+    f.sub_room, 
+    g.supM_name, 
+    c.assign_render_status, 
+    c.assign_evaluation_status;
+";
         $stmt = $conn->prepare($sql);
         $stmt->execute();
         $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -432,16 +459,45 @@ LIMIT 1
     {
         include "connection.php";
 
-        $sql = "SELECT assign_stud_id, stud_name, dutyH_name, build_name, supM_name, assign_render_status, assign_evaluation_status
-                FROM tbl_assign_scholars AS a
-                LEFT JOIN tbl_activescholars AS b ON b.stud_active_id = a.assign_stud_id
-                INNER JOIN tbl_scholars AS c ON c.stud_id = b.stud_active_id
-                INNER JOIN tbl_duty_hours AS d ON d.dutyH_id = a.assign_duty_hours_id
-                INNER JOIN tbl_office_master AS e ON e.off_id = a.assign_office_id
-                INNER JOIN tbl_office_type AS f ON f.offT_id = e.off_type_id
-                INNER JOIN tbl_department AS g ON g.dept_id = f.offT_dept_id
-                INNER JOIN tbl_building AS h ON h.build_id = g.dept_build_id
-                INNER JOIN tbl_supervisors_master AS j ON j.supM_id = f.offT_supM_id";
+        $sql = "SELECT 
+    a.assign_stud_id, 
+    c.stud_name, 
+    d.dutyH_name, 
+    h.build_name, 
+    i.supM_name, 
+    a.assign_render_status, 
+    a.assign_evaluation_status, 
+    SUM(TIMESTAMPDIFF(HOUR, j.dtr_current_time_in, j.dtr_current_time_out)) AS total_rendered_hours,
+    (180 - SUM(TIMESTAMPDIFF(HOUR, j.dtr_current_time_in, j.dtr_current_time_out))) AS remaining_hours
+FROM 
+    tbl_assign_scholars AS a
+LEFT JOIN 
+    tbl_activescholars AS b ON b.stud_active_id = a.assign_stud_id
+INNER JOIN 
+    tbl_scholars AS c ON c.stud_id = b.stud_active_id
+INNER JOIN 
+    tbl_duty_hours AS d ON d.dutyH_id = a.assign_duty_hours_id
+INNER JOIN 
+    tbl_office_master AS e ON e.off_id = a.assign_office_id
+INNER JOIN 
+    tbl_office_type AS f ON f.offT_id = e.off_type_id
+INNER JOIN 
+    tbl_department AS g ON g.dept_id = f.offT_dept_id
+INNER JOIN 
+    tbl_building AS h ON h.build_id = g.dept_build_id
+INNER JOIN 
+    tbl_supervisors_master AS i ON i.supM_id = f.offT_supM_id
+INNER JOIN 
+    tbl_dtr AS j ON j.dtr_assign_id = a.assign_id
+GROUP BY 
+    a.assign_stud_id, 
+    c.stud_name, 
+    d.dutyH_name, 
+    h.build_name, 
+    i.supM_name, 
+    a.assign_render_status, 
+    a.assign_evaluation_status;
+";
         $stmt = $conn->prepare($sql);
         $stmt->execute();
         $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
